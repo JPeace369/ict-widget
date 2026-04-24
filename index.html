@@ -1,0 +1,1358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ICT PD-Array Signal Widget · v4</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#11151c; --panel2:#161b25; --line:#232a36;
+    --fg:#cfd4dc; --muted:#7a8390; --gold:#f3c969;
+    --green:#2ecc71; --red:#ff6a6a; --blue:#4da3ff;
+    --yellow:#f6d365; --fuchsia:#ff5cbf; --orange:#ff9f43;
+    --cyan:#55d8d8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:13.2px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;}
+
+  header{padding:8px 12px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--panel)}
+  header h1{font:600 13px/1 inherit;margin:0;letter-spacing:.4px}
+  header .badge{background:#222;padding:2px 7px;border-radius:3px;color:var(--muted);font-size:11px}
+  .conn{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:4px;vertical-align:middle}
+  .conn.ok{background:var(--green)}
+
+  .clocks{display:flex;gap:10px}
+  .clk{display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);min-width:70px;cursor:pointer;user-select:none}
+  .clk:hover{border-color:var(--blue)}
+  .clk .label{font-size:10px;color:var(--muted);letter-spacing:.5px;font-weight:600}
+  .clk .digital{font-size:11px;font-variant-numeric:tabular-nums;color:var(--gold)}
+  .clk.live{border-color:var(--gold);box-shadow:0 0 0 1px rgba(243,201,105,.3) inset}
+  .clk.selected{border-color:var(--blue);box-shadow:0 0 0 1px rgba(77,163,255,.45) inset}
+  .clk svg{display:block}
+
+  .legend{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;align-items:center;max-width:460px}
+  .legend .chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);padding:2px 5px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+  .legend .sq{display:inline-block;width:9px;height:9px;border-radius:2px}
+
+  .controls{display:flex;gap:6px;padding:6px 10px;background:var(--panel2);border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+  .controls input,.controls select,.controls button{background:var(--bg);border:1px solid var(--line);color:var(--fg);padding:4px 8px;border-radius:3px;font:inherit}
+  .controls input{text-transform:uppercase;min-width:140px}
+  .controls button{cursor:pointer}
+  .controls button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .controls button.notif{background:var(--gold);border-color:var(--gold);color:#000}
+  .controls .tfgroup,.controls .sidegroup{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .controls .tfgroup button,.controls .sidegroup button{border:0;border-radius:0;background:var(--bg);padding:4px 9px;color:var(--muted)}
+  .controls .tfgroup button.on{background:var(--blue);color:#fff}
+  .controls .sidegroup button.on-L{background:var(--green);color:#000}
+  .controls .sidegroup button.on-B{background:var(--fuchsia);color:#fff}
+  .controls .sidegroup button.on-S{background:var(--red);color:#fff}
+  .controls label{color:var(--muted);font-size:11px;margin-right:2px}
+
+  /* USDT.D bar */
+  .usdtD{margin:6px 10px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:5px 10px;display:flex;align-items:center;gap:12px;font-size:11px;flex-wrap:wrap}
+  .usdtD .k{color:var(--muted)}
+  .usdtD .v{font-weight:600;font-variant-numeric:tabular-nums}
+  .usdtD .tag{padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.3px}
+  .usdtD .tag.on{background:rgba(46,204,113,.18);color:var(--green)}   /* risk-on */
+  .usdtD .tag.off{background:rgba(255,106,106,.18);color:var(--red)}   /* risk-off */
+  .usdtD .tag.flat{background:rgba(122,131,144,.18);color:var(--muted)}
+
+  /* Session strip */
+  .sclock{margin:6px 10px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:6px 8px}
+  .sclock-head{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px;color:var(--muted);letter-spacing:.3px;text-transform:uppercase;font-weight:600}
+  .sclock-head .tz{color:var(--gold)}
+  .sclock-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+  .sclock .kz{padding:5px;border-radius:3px;text-align:center;font-size:10px;background:var(--panel2);border:1px solid var(--line)}
+  .sclock .kz.active{outline:2px solid var(--gold);background:rgba(243,201,105,.08)}
+  .sclock .kz .name{font-weight:600;letter-spacing:.4px}
+  .sclock .kz .time{color:var(--muted);font-size:9px;margin-top:2px}
+  .sclock .kz.pulse.active{outline-color:var(--yellow);background:rgba(246,211,101,.08)}
+
+  /* Ticker grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px;padding:6px 10px}
+  .ticker-card{background:var(--panel);border:1px solid var(--line);border-radius:5px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+  .ticker-card.cluster-l::before{content:"🦖";position:absolute;top:3px;right:28px;font-size:18px;animation:pulse 1.4s ease-in-out infinite;text-shadow:0 0 10px rgba(85,216,216,.8);filter:drop-shadow(0 0 3px rgba(85,216,216,.6))}
+  .ticker-card.cluster-s::before{content:"🦖";position:absolute;top:3px;right:28px;font-size:18px;animation:pulse 1.4s ease-in-out infinite;text-shadow:0 0 10px rgba(255,60,60,.95);filter:drop-shadow(0 0 3px rgba(255,60,60,.9)) hue-rotate(150deg) saturate(3)}
+  .ticker-card.cluster-b::before{content:"🦖🦖";position:absolute;top:3px;right:28px;font-size:16px;letter-spacing:-3px;animation:pulse 1.4s ease-in-out infinite;text-shadow:0 0 10px rgba(255,92,191,.95)}
+  @keyframes pulse{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+  .ticker-head{padding:5px 8px;display:flex;align-items:center;gap:6px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .ticker-head .sym{font-weight:600;font-size:12px;letter-spacing:.4px}
+  .ticker-head .price{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:500;font-size:11px}
+  .ticker-head .rm{background:transparent;border:1px solid var(--line);color:var(--muted);padding:1px 5px;border-radius:2px;cursor:pointer;font-size:10px}
+  .ticker-head .rm:hover{color:var(--red);border-color:var(--red)}
+
+  /* TF-cluster row of mini-badges per timeframe showing long/short/no state */
+  .tfcluster{display:flex;gap:3px;padding:4px 8px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:9px}
+  .tfcluster .tb{padding:1px 5px;border:1px solid var(--line);border-radius:2px;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.3px}
+  .tfcluster .tb.bull{border-color:var(--green);color:var(--green);background:rgba(46,204,113,.08)}
+  .tfcluster .tb.bear{border-color:var(--red);color:var(--red);background:rgba(255,106,106,.08)}
+  .tfcluster .tb.both{border-color:var(--fuchsia);color:var(--fuchsia);background:rgba(255,92,191,.08)}
+  .tfcluster .tb.off{opacity:.55}
+
+  /* Card body layout */
+  .card-body{display:grid;grid-template-columns:1fr 22px;gap:0}
+  table.pd{width:100%;border-collapse:collapse;font-size:10.5px}
+  table.pd td,table.pd th{padding:2px 6px;border-bottom:1px solid var(--line)}
+  table.pd th{color:var(--muted);text-align:left;font-weight:500;background:var(--panel2);font-size:10px}
+  table.pd td.dot{text-align:center;width:22px}
+  .dot.on-L{color:var(--green)}
+  .dot.on-S{color:var(--red)}
+  .dot.off{color:#343945}
+  .score-row td{font-weight:600;background:rgba(255,255,255,.02)}
+  .score-row .sL.hit{color:var(--green)} .score-row .sS.hit{color:var(--red)}
+  .unicorn-row td{color:var(--fuchsia);font-weight:600}
+  .sectionbreak td{background:var(--panel2);color:var(--muted);font-size:9.5px;letter-spacing:.4px;padding:2px 6px;border-bottom:1px solid var(--line);text-transform:uppercase}
+  .exit-row td{color:var(--orange)}
+  .exit-row td.fire{color:var(--red);font-weight:600}
+
+  .volbar{position:relative;width:22px;background:var(--panel2);border-left:1px solid var(--line);min-height:60px}
+  .volbar .fill{position:absolute;bottom:0;left:0;right:0;transition:height .3s ease}
+  .volbar .mark{position:absolute;left:0;right:0;height:1px;background:var(--line);opacity:.6}
+  .vollabel{font-size:9px;text-align:center;padding:1px 0;color:var(--muted);background:var(--panel2);border-top:1px solid var(--line)}
+
+  /* On-chain panel */
+  .onchain{padding:4px 6px;border-top:1px solid var(--line);background:var(--panel2);font-size:10px;display:grid;grid-template-columns:1fr 1fr;gap:2px 8px}
+  .onchain .oc-row{display:flex;justify-content:space-between;gap:4px}
+  .onchain .k{color:var(--muted)}
+  .onchain .v{font-variant-numeric:tabular-nums;font-weight:500}
+  .onchain .v.pos{color:var(--green)} .onchain .v.neg{color:var(--red)}
+  .onchain .links{grid-column:1 / -1;display:flex;gap:8px;justify-content:flex-end;padding-top:2px;border-top:1px dashed var(--line);margin-top:2px}
+  .onchain .links a{font-size:9px;color:var(--blue);text-decoration:none}
+  .onchain .links a:hover{text-decoration:underline}
+  /* Liquidation band strip: neutral, thickness = $ concentration */
+  .liqbar{grid-column:1 / -1;position:relative;height:22px;background:#0d1118;border:1px solid var(--line);border-radius:2px;margin-top:2px}
+  .liqbar .mid{position:absolute;top:0;bottom:0;width:2px;left:50%;background:var(--gold);opacity:.85}
+  .liqbar .tick{position:absolute;top:2px;bottom:2px;background:var(--fg);opacity:.85;border-radius:1px}
+  .liqbar .tick.lo{opacity:.55}
+  .liqbar .label{position:absolute;top:-12px;font-size:8.5px;color:var(--muted);letter-spacing:.3px}
+  .liqbar .label.L{left:2px} .liqbar .label.R{right:2px}
+
+  /* Panel chrome: hide/show per panel */
+  .panel{margin:6px 10px;background:var(--panel);border:1px solid var(--line);border-radius:5px;overflow:hidden}
+  .panel h3{margin:0;padding:5px 10px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:11px;letter-spacing:.4px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+  .panel h3 .sub{color:var(--muted);font-weight:400;font-size:10px}
+  .panel h3 .btn{margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--muted);padding:1px 6px;border-radius:2px;cursor:pointer;font-size:10px}
+  .panel h3 .chev{color:var(--muted);font-size:12px;margin-left:4px;transition:transform .15s}
+  .panel.hidden .pbody{display:none}
+  .panel.hidden h3 .chev{transform:rotate(-90deg)}
+
+  /* Confluence table */
+  .conf-wrap{overflow:auto;max-height:360px}
+  .conf-table{width:100%;border-collapse:collapse;font-size:10.5px}
+  .conf-table th,.conf-table td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .conf-table th{background:var(--panel2);color:var(--muted);font-weight:500;font-size:10px;position:sticky;top:0}
+  .conf-table td.live{font-weight:600}
+  .conf-table .day-hi{color:var(--green);font-weight:600}
+  .conf-table .day-md{color:var(--yellow)}
+  .conf-table .day-lo{color:var(--muted)}
+  .conf-table .tier-A{color:var(--green);font-weight:600}
+  .conf-table .tier-B{color:var(--yellow)}
+  .conf-table .tier-C{color:var(--muted)}
+  .conf-table tr.match td{background:rgba(243,201,105,.06);outline:1px solid rgba(243,201,105,.3);outline-offset:-1px}
+
+  /* Economic calendar */
+  .econ-wrap{overflow:auto;max-height:320px}
+  .econ-table{width:100%;border-collapse:collapse;font-size:10.5px}
+  .econ-table th,.econ-table td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .econ-table th{background:var(--panel2);color:var(--muted);font-weight:500;font-size:10px}
+  .econ-table .imp{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+  .econ-table .imp.high{background:var(--red)}
+  .econ-table .imp.med{background:var(--orange)}
+  .econ-table .cluster-row td{background:rgba(85,216,216,.05);outline:1px solid rgba(85,216,216,.3);outline-offset:-1px}
+  .econ-alert{padding:6px 10px;background:rgba(85,216,216,.08);border:1px dashed var(--cyan);margin:6px 10px;border-radius:4px;color:var(--cyan);font-size:11px}
+
+  /* Feed */
+  .feed{max-height:240px;overflow:auto}
+  .feed ul{list-style:none;margin:0;padding:0;font:10.5px/1.4 ui-monospace,Menlo,monospace}
+  .feed li{padding:2px 10px;border-bottom:1px solid var(--line);display:flex;gap:8px}
+  .feed li .t{color:var(--muted);width:70px;flex:none;font-variant-numeric:tabular-nums}
+  .feed li .sym{color:var(--gold);width:70px;flex:none}
+  .feed li.long .msg{color:var(--green)}
+  .feed li.short .msg{color:var(--red)}
+  .feed li.unicorn .msg{color:var(--fuchsia);font-weight:600}
+  .feed li.exit .msg{color:var(--orange);font-weight:600}
+  .feed li.info .msg{color:var(--blue)}
+  .feed li.warn .msg{color:var(--yellow)}
+  .feed li.confl .msg{color:var(--cyan);font-weight:600}
+  .feed li.dino .msg{color:var(--cyan);font-weight:700;font-size:11.5px}
+  .feed li.dino-s .msg{color:var(--red);font-weight:700;font-size:11.5px}
+  .feed li.oi .msg{color:var(--orange)}
+
+  /* OI table accents */
+  .oi-pos{color:var(--green);font-weight:600}
+  .oi-neg{color:var(--red);font-weight:600}
+  .oi-hist{color:var(--muted);font-variant-numeric:tabular-nums;font-size:10px}
+
+  footer{padding:6px 12px;color:var(--muted);font-size:10px;border-top:1px solid var(--line);background:var(--panel)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎯 ICT PD-Array Signal Widget <span style="color:var(--muted);font-weight:400;font-size:11px">v6</span></h1>
+  <span class="badge">Binance.US WS + Futures REST · CoinGecko · OI top-5</span>
+  <span class="badge"><span id="connDot" class="conn"></span><span id="connTxt">connecting…</span></span>
+
+  <div class="clocks" id="clocks">
+    <div class="clk" data-tz="America/New_York" id="clk-ny"><div class="label">NEW YORK</div><svg width="44" height="44" viewBox="-22 -22 44 44"><circle r="20" fill="#161b25" stroke="#232a36"/><line class="mh" x1="0" y1="0" x2="0" y2="-11" stroke="#cfd4dc" stroke-width="2" stroke-linecap="round"/><line class="mm" x1="0" y1="0" x2="0" y2="-15" stroke="#cfd4dc" stroke-width="1.5" stroke-linecap="round"/><line class="ms" x1="0" y1="0" x2="0" y2="-17" stroke="#f3c969" stroke-width="0.8" stroke-linecap="round"/><circle r="1.5" fill="#f3c969"/></svg><div class="digital">--:--</div></div>
+    <div class="clk" data-tz="Europe/London" id="clk-ldn"><div class="label">LONDON</div><svg width="44" height="44" viewBox="-22 -22 44 44"><circle r="20" fill="#161b25" stroke="#232a36"/><line class="mh" x1="0" y1="0" x2="0" y2="-11" stroke="#cfd4dc" stroke-width="2" stroke-linecap="round"/><line class="mm" x1="0" y1="0" x2="0" y2="-15" stroke="#cfd4dc" stroke-width="1.5" stroke-linecap="round"/><line class="ms" x1="0" y1="0" x2="0" y2="-17" stroke="#f3c969" stroke-width="0.8" stroke-linecap="round"/><circle r="1.5" fill="#f3c969"/></svg><div class="digital">--:--</div></div>
+    <div class="clk" data-tz="Asia/Tokyo" id="clk-tky"><div class="label">TOKYO</div><svg width="44" height="44" viewBox="-22 -22 44 44"><circle r="20" fill="#161b25" stroke="#232a36"/><line class="mh" x1="0" y1="0" x2="0" y2="-11" stroke="#cfd4dc" stroke-width="2" stroke-linecap="round"/><line class="mm" x1="0" y1="0" x2="0" y2="-15" stroke="#cfd4dc" stroke-width="1.5" stroke-linecap="round"/><line class="ms" x1="0" y1="0" x2="0" y2="-17" stroke="#f3c969" stroke-width="0.8" stroke-linecap="round"/><circle r="1.5" fill="#f3c969"/></svg><div class="digital">--:--</div></div>
+  </div>
+
+</header>
+
+<div class="controls">
+  <input id="newSym" placeholder="Ticker e.g. SOLUSDT" list="tickersuggest">
+  <datalist id="tickersuggest">
+    <option>BTCUSDT</option><option>XRPUSDT</option><option>ETHUSDT</option><option>SOLUSDT</option>
+    <option>DOGEUSDT</option><option>AVAXUSDT</option><option>LINKUSDT</option><option>ADAUSDT</option>
+    <option>BNBUSDT</option><option>LTCUSDT</option><option>MATICUSDT</option><option>DOTUSDT</option>
+  </datalist>
+  <button class="primary" onclick="addTicker()">+ Add</button>
+
+  <label>TF:</label>
+  <div class="tfgroup" id="tfgroup">
+    <button data-tf="15m" class="on">15m</button>
+    <button data-tf="1h">1h</button>
+    <button data-tf="4h">4h</button>
+    <button data-tf="1d">D</button>
+    <button data-tf="5d">5D</button>
+    <button data-tf="1w">W</button>
+    <button data-tf="1M">M</button>
+  </div>
+
+  <label>Side:</label>
+  <div class="sidegroup" id="sidegroup">
+    <button data-side="long">Longs</button>
+    <button data-side="both" class="on-B">Both</button>
+    <button data-side="short">Shorts</button>
+  </div>
+
+  <span class="badge" style="margin-left:auto">source: binance.us</span>
+</div>
+
+<div class="usdtD" id="usdtD">
+  <span class="k">USDT.D</span><span class="v" id="usdtD_v">—</span>
+  <span id="usdtD_chg" style="color:var(--muted)">Δ24h —</span>
+  <span class="tag flat" id="usdtD_tag">neutral</span>
+  <span style="color:var(--muted);font-size:10px">↑ USDT dominance = capital rotating to cash → risk-off for BTC/alts · ↓ = risk-on</span>
+</div>
+
+<div class="panel" id="panel-sclock" data-key="sclock">
+  <h3 onclick="togglePanel('sclock')">⏱ Session killzones <span class="sub">(click a clock to switch timezone)</span><span class="chev">▾</span></h3>
+  <div class="pbody sclock" id="sclock">
+    <div class="sclock-head">Active zone: <span class="tz" id="sclock_tz">America/New_York</span></div>
+    <div class="sclock-grid" id="sclock_grid"></div>
+  </div>
+</div>
+
+<div class="panel" id="panel-oi" data-key="oi">
+  <h3 onclick="togglePanel('oi')">📊 Open Interest · top 5 USDT futures <span class="sub">(Binance Futures · Δ 1h / 4h / 24h · snapshots −48h / −72h)</span><span class="chev">▾</span></h3>
+  <div class="pbody">
+    <div style="overflow:auto;max-height:280px">
+      <table class="conf-table" id="oiTable">
+        <thead><tr>
+          <th style="width:10%">Symbol</th>
+          <th style="width:13%">OI (contracts)</th>
+          <th style="width:10%">Δ 1h</th>
+          <th style="width:10%">Δ 4h</th>
+          <th style="width:10%">Δ 24h</th>
+          <th style="width:14%">−48h</th>
+          <th style="width:14%">−72h</th>
+          <th>Read</th>
+        </tr></thead>
+        <tbody id="oiBody"><tr><td colspan="8" style="color:var(--muted);padding:10px">loading OI snapshots…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-grid" data-key="grid">
+  <h3 onclick="togglePanel('grid')">📈 Tickers <span class="sub">(PD arrays, exits, RSI, volume)</span><span class="chev">▾</span></h3>
+  <div class="pbody"><div class="grid" id="grid"></div></div>
+</div>
+
+<div class="panel" id="panel-confluence" data-key="confluence">
+  <h3 onclick="togglePanel('confluence')">🧩 Situation × Timeframe confluence <span class="sub">(live match vs active tickers · HTF-bias filter ON)</span><span class="chev">▾</span></h3>
+  <div class="pbody conf-wrap">
+    <table class="conf-table" id="confTable">
+      <thead><tr>
+        <th style="width:15%">Situation</th>
+        <th style="width:8%">Best TF</th>
+        <th style="width:9%">Best days</th>
+        <th style="width:9%">Hold time</th>
+        <th style="width:18%">Why this day/TF</th>
+        <th style="width:6%">Tier</th>
+        <th>Live match (ticker · bias)</th>
+      </tr></thead>
+      <tbody id="confBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel" id="panel-feed" data-key="feed">
+  <h3 onclick="togglePanel('feed')">📡 Signal feed <span class="sub">· 🦖 = 3+ confluence cluster · desktop alerts throttled 15 min</span>
+    <button class="btn" onclick="event.stopPropagation();clearFeed()">clear</button><span class="chev">▾</span></h3>
+  <div class="pbody feed"><ul id="feed"></ul></div>
+</div>
+
+<footer>
+  Backtested logic — not financial advice. Data © Binance.US spot + Binance Futures · CoinGecko global. All computation runs in your browser.
+</footer>
+
+<script>
+/* ============================================================================
+   ICT PD-Array live signal engine · v4
+   ============================================================================ */
+
+const STATE = {
+  tickers: JSON.parse(localStorage.getItem("ict_tickers") || '["BTCUSDT","XRPUSDT"]'),
+  endpoint: "wss://stream.binance.us:9443/ws",
+  tf: localStorage.getItem("ict_tf") || "15m",
+  side: localStorage.getItem("ict_side") || "both",     // long | both | short
+  clockTz: localStorage.getItem("ict_clockTz") || "America/New_York",
+  panels: JSON.parse(localStorage.getItem("ict_panels") || '{}'),
+  data: {},
+  notifOn: false,
+  lastPulseState: {},
+  lastNotif: {},                // throttle: key -> epoch ms
+  confBuffer: {},               // `${sym}:${side}` -> [{sitId, ts}]
+  econ: [],                     // ForexFactory events
+  econAlertShown: false,
+  usdt: { now:null, prev:null, delta:null },
+};
+const NOTIF_THROTTLE_MS = 15 * 60 * 1000;
+const CLUSTER_WINDOW_MS = 2 * 60 * 1000;
+const CLUSTER_THRESHOLD = 3;
+
+/* ---------- TF map (resample 5d from 1d) ---------------------------------- */
+const TF_MAP = {
+  "15m":{ native:"15m", mult:1 },
+  "1h": { native:"1h",  mult:1 },
+  "4h": { native:"4h",  mult:1 },
+  "1d": { native:"1d",  mult:1 },
+  "5d": { native:"1d",  mult:5 },
+  "1w": { native:"1w",  mult:1 },
+  "1M": { native:"1M",  mult:1 },
+};
+function resampleBars(bars, m){
+  if(m<=1) return bars;
+  const out=[];
+  for(let i=0;i<bars.length;i+=m){
+    const slice = bars.slice(i, i+m);
+    if(slice.length===0) continue;
+    out.push({
+      t: slice[0].t,
+      o: slice[0].o,
+      h: Math.max(...slice.map(b=>b.h)),
+      l: Math.min(...slice.map(b=>b.l)),
+      c: slice[slice.length-1].c,
+      v: slice.reduce((a,b)=>a+b.v,0),
+    });
+  }
+  return out;
+}
+
+/* ---------- Situation catalogue ------------------------------------------ */
+const SITUATIONS = [
+  { id:"unicorn", name:"Unicorn (BB + FVG)", tier:"A", tfs:["15m","1h"],
+    days:["Tue","Wed","Thu"], dayScore:{Mon:1,Tue:3,Wed:3,Thu:2,Fri:1,Sat:0,Sun:0},
+    hold:"1-4 bars (~30m-4h)",
+    why:"NY AM displacement creates breaker + fresh FVG on same leg; Tue/Wed carry week's widest range.",
+    check:pd => [pd.arrays["★ UNICORN"][0], pd.arrays["★ UNICORN"][1]] },
+  { id:"silver", name:"Silver Bullet FVG fill", tier:"A", tfs:["15m"],
+    days:["Tue","Wed","Thu"], dayScore:{Mon:1,Tue:3,Wed:3,Thu:2,Fri:1,Sat:0,Sun:0},
+    hold:"30-90 min",
+    why:"10-11 ET window fills prior NY-AM FVG; drops Mon/Fri.",
+    check:pd => [pd.arrays["Fair Value Gap"][0] && pd.inSilver, pd.arrays["Fair Value Gap"][1] && pd.inSilver] },
+  { id:"ob_mit", name:"Order Block mitigation", tier:"A", tfs:["1h","4h"],
+    days:["Tue","Wed","Thu"], dayScore:{Mon:1,Tue:2,Wed:3,Thu:2,Fri:1,Sat:0,Sun:0},
+    hold:"2-6 bars (~4h-1d)",
+    why:"HTF OB tap after London sweep; midweek liquidity pool largest.",
+    check:pd => [pd.arrays["Order Block"][0] && pd.arrays["Mitigation"][0], pd.arrays["Order Block"][1] && pd.arrays["Mitigation"][1]] },
+  { id:"sweep_fvg", name:"Liquidity sweep → FVG", tier:"A", tfs:["15m","1h"],
+    days:["Tue","Wed","Thu"], dayScore:{Mon:1,Tue:3,Wed:3,Thu:2,Fri:1,Sat:0,Sun:0},
+    hold:"1-4 bars (~30m-4h)",
+    why:"Asia/London sweep into NY FVG; weekends thin, Mon gap-risky.",
+    check:pd => [pd.arrays["Sweep (<4 bar)"][0] && pd.arrays["Fair Value Gap"][0], pd.arrays["Sweep (<4 bar)"][1] && pd.arrays["Fair Value Gap"][1]] },
+  { id:"bb_reclaim", name:"Breaker Block reclaim", tier:"B", tfs:["1h","4h"],
+    days:["Wed","Thu"], dayScore:{Mon:1,Tue:2,Wed:3,Thu:3,Fri:1,Sat:0,Sun:0},
+    hold:"4-12 bars (~8h-2d)",
+    why:"Late-week continuation after structure shift; Fri often fades.",
+    check:pd => [pd.arrays["Breaker Block"][0] && pd.biasL, pd.arrays["Breaker Block"][1] && pd.biasS] },
+  { id:"pdhl", name:"PDH/PDL sweep reversal", tier:"A", tfs:["15m","1h"],
+    days:["Tue","Wed"], dayScore:{Mon:1,Tue:3,Wed:3,Thu:2,Fri:2,Sat:0,Sun:0},
+    hold:"1-3 bars (~30m-3h)",
+    why:"Daily hi/lo raids at London; Tue/Wed cleanest rotation.",
+    check:pd => [pd.exits["PDH/PDL sweep"][0], pd.exits["PDH/PDL sweep"][1]] },
+  { id:"turtle", name:"Turtle soup reversal", tier:"B", tfs:["15m"],
+    days:["Mon","Tue","Wed"], dayScore:{Mon:2,Tue:3,Wed:3,Thu:2,Fri:1,Sat:0,Sun:0},
+    hold:"2-6 bars (~30m-1.5h)",
+    why:"Failed breakout inside range regime; Mon-Wed ranges print best.",
+    check:pd => [pd.exits["Turtle soup"][0], pd.exits["Turtle soup"][1]] },
+  { id:"equalhl", name:"Equal highs/lows liquidity", tier:"B", tfs:["4h","1d"],
+    days:["Wed","Thu"], dayScore:{Mon:1,Tue:2,Wed:3,Thu:3,Fri:1,Sat:0,Sun:0},
+    hold:"4-12 bars (~16h-3d)",
+    why:"Stacked stops drawn down by Wed midpoint; weekly flushes cluster.",
+    check:pd => [pd.equalLows, pd.equalHighs] },
+  { id:"disp_ob", name:"Displacement + OB tap", tier:"A", tfs:["1h"],
+    days:["Tue","Wed","Thu"], dayScore:{Mon:1,Tue:3,Wed:3,Thu:2,Fri:1,Sat:0,Sun:0},
+    hold:"3-8 bars (~3-8h)",
+    why:"NY-AM displacement creates fresh OB; midweek session confirms.",
+    check:pd => [pd.arrays["Order Block"][0] && pd.displUp, pd.arrays["Order Block"][1] && pd.displDn] },
+  { id:"ote", name:"OTE 62-79% retrace", tier:"B", tfs:["15m","1h"],
+    days:["Tue","Wed","Thu"], dayScore:{Mon:1,Tue:2,Wed:3,Thu:2,Fri:1,Sat:0,Sun:0},
+    hold:"1-4 bars (~30m-4h)",
+    why:"Optimal trade entry inside HTF bias; strongest where 4H+1H align.",
+    check:pd => [pd.inOteL, pd.inOteS] },
+  { id:"ifvg", name:"Inverted FVG reclaim", tier:"B", tfs:["1h","4h"],
+    days:["Wed","Thu"], dayScore:{Mon:1,Tue:2,Wed:3,Thu:3,Fri:1,Sat:0,Sun:0},
+    hold:"2-8 bars (~2-8h)",
+    why:"FVG broken then reclaimed = trap reversal; Wed/Thu.",
+    check:pd => [pd.exits["Inverted FVG"][0], pd.exits["Inverted FVG"][1]] },
+  { id:"rsidiv", name:"RSI divergence at extreme", tier:"B", tfs:["15m","1h","4h"],
+    days:["Thu","Fri"], dayScore:{Mon:1,Tue:1,Wed:2,Thu:3,Fri:3,Sat:0,Sun:0},
+    hold:"1-5 bars (exit signal)",
+    why:"Exhaustion into Thu/Fri NY PM as weekly positions unwind.",
+    check:pd => [pd.exits["RSI divergence"][0] && pd.exits["Extreme P/D"][0], pd.exits["RSI divergence"][1] && pd.exits["Extreme P/D"][1]] },
+  { id:"premdisc", name:"Premium / Discount extreme", tier:"C", tfs:["1h","4h","1d"],
+    days:["Thu","Fri"], dayScore:{Mon:1,Tue:1,Wed:2,Thu:3,Fri:3,Sat:0,Sun:0},
+    hold:"exit only (~1-3 bars)",
+    why:"Used to exit, not enter; weekly close compresses range Thu-Fri.",
+    check:pd => [pd.exits["Extreme P/D"][0], pd.exits["Extreme P/D"][1]] },
+];
+
+/* ---------- Indicators ---------------------------------------------------- */
+function ema(arr, span){
+  const k = 2/(span+1); let e=null, out=[];
+  for(const v of arr){ e = e===null ? v : v*k + e*(1-k); out.push(e); }
+  return out;
+}
+function rsi(closes, period){
+  const out = new Array(closes.length).fill(null);
+  if(closes.length < period+1) return out;
+  let g=0, l=0;
+  for(let i=1;i<=period;i++){ const d = closes[i]-closes[i-1]; if(d>=0) g+=d; else l-=d; }
+  g/=period; l/=period;
+  out[period] = l===0 ? 100 : 100 - 100/(1+g/l);
+  for(let i=period+1;i<closes.length;i++){
+    const d = closes[i]-closes[i-1];
+    g = (g*(period-1) + Math.max(d,0))/period;
+    l = (l*(period-1) + Math.max(-d,0))/period;
+    out[i] = l===0 ? 100 : 100 - 100/(1+g/l);
+  }
+  return out;
+}
+function pivots(arr, L){
+  const ph = new Array(arr.length).fill(null);
+  const pl = new Array(arr.length).fill(null);
+  for(let i=L;i<arr.length-L;i++){
+    let isH=true, isL=true;
+    for(let k=1;k<=L;k++){
+      if(arr[i].h <= arr[i-k].h || arr[i].h <= arr[i+k].h) isH=false;
+      if(arr[i].l >= arr[i-k].l || arr[i].l >= arr[i+k].l) isL=false;
+    }
+    if(isH) ph[i]=arr[i].h;
+    if(isL) pl[i]=arr[i].l;
+  }
+  return {ph,pl};
+}
+
+/* ---------- PD + exit detector ------------------------------------------- */
+function computeArrays(exec, h1, h4, dly){
+  const N = exec.length;
+  if(N<30 || h1.length<15 || h4.length<55) return null;
+
+  const c = exec.map(x=>x.c), o = exec.map(x=>x.o),
+        h = exec.map(x=>x.h), l = exec.map(x=>x.l), v = exec.map(x=>x.v);
+
+  const e4 = ema(h4.map(x=>x.c), 50);
+  const last4hEma = e4[e4.length-1];
+  const lastC = c[N-1];
+  const bias4hLong  = lastC > last4hEma;
+  const bias4hShort = lastC < last4hEma;
+
+  const {ph:phH, pl:plH} = pivots(h1, 3);
+  let lastHHH=null, lastLLH=null;
+  for(let i=0;i<h1.length;i++){ if(phH[i]!==null) lastHHH=phH[i]; if(plH[i]!==null) lastLLH=plH[i]; }
+  const h1c = h1[h1.length-1].c;
+  const s1hLong  = lastHHH!=null && h1c > lastHHH;
+  const s1hShort = lastLLH!=null && h1c < lastLLH;
+  const biasL = bias4hLong && s1hLong;
+  const biasS = bias4hShort && s1hShort;
+
+  const swLen = 10;
+  const {ph:pex, pl:lex} = pivots(exec, swLen);
+  let lastHi=null,lastLo=null;
+  for(let i=0;i<N-swLen;i++){ if(pex[i]!=null) lastHi=pex[i]; if(lex[i]!=null) lastLo=lex[i]; }
+  const sH = lastHi!=null && h[N-1] > lastHi && c[N-1] < lastHi;
+  const sL = lastLo!=null && l[N-1] < lastLo && c[N-1] > lastLo;
+  let sweepLo4=sL, sweepHi4=sH;
+  for(let k=1;k<4;k++){
+    if(lastLo!=null && l[N-1-k] < lastLo && c[N-1-k] > lastLo) sweepLo4=true;
+    if(lastHi!=null && h[N-1-k] > lastHi && c[N-1-k] < lastHi) sweepHi4=true;
+  }
+
+  let bullT=null,bullB=null,bearT=null,bearB=null;
+  const start = Math.max(2, N-100);
+  for(let i=start;i<N;i++){
+    const bull = l[i] > h[i-2];
+    const bear = h[i] < l[i-2];
+    if(bull && ((l[i]-h[i-2])/c[i]*100) >= 0.10){ bullT=l[i]; bullB=h[i-2]; }
+    if(bear && ((l[i-2]-h[i])/c[i]*100) >= 0.10){ bearT=l[i-2]; bearB=h[i]; }
+    if(bullB!=null && c[i] < bullB){ bullT=null; bullB=null; }
+    if(bearT!=null && c[i] > bearT){ bearT=null; bearB=null; }
+  }
+  const inBullFvg = bullB!=null && l[N-1] <= bullT && l[N-1] >= bullB;
+  const inBearFvg = bearT!=null && h[N-1] >= bearB && h[N-1] <= bearT;
+
+  const rng20 = [];
+  for(let i=19;i<N;i++){
+    let s=0; for(let k=0;k<20;k++) s+=(h[i-k]-l[i-k]); rng20[i]=s/20;
+  }
+  const r = rng20[N-1] || (h[N-1]-l[N-1]);
+  const displUp = c[N-1]>o[N-1] && (c[N-1]-o[N-1]) > 1.5*r;
+  const displDn = c[N-1]<o[N-1] && (o[N-1]-c[N-1]) > 1.5*r;
+  let obBullT=null,obBullB=null,obBearT=null,obBearB=null;
+  if(displUp) for(let k=1;k<=5;k++) if(c[N-1-k] < o[N-1-k]){ obBullT=h[N-1-k]; obBullB=l[N-1-k]; break; }
+  if(displDn) for(let k=1;k<=5;k++) if(c[N-1-k] > o[N-1-k]){ obBearT=h[N-1-k]; obBearB=l[N-1-k]; break; }
+  const inBullOB = obBullB!=null && l[N-1] <= obBullT && l[N-1] >= obBullB;
+  const inBearOB = obBearT!=null && h[N-1] >= obBearB && h[N-1] <= obBearT;
+
+  let bbBull=false, bbBear=false;
+  for(let i=Math.max(10,N-50);i<N-1;i++){
+    if(o[i]>c[i] && c[N-1] > h[i]) bbBull=true;
+    if(o[i]<c[i] && c[N-1] < l[i]) bbBear=true;
+  }
+
+  let rbL=false, rbS=false;
+  for(let k=0;k<10 && N-1-k>=0;k++){
+    const i=N-1-k;
+    const body=Math.abs(c[i]-o[i]);
+    const lw=Math.min(o[i],c[i])-l[i];
+    const uw=h[i]-Math.max(o[i],c[i]);
+    const iSL = lastLo!=null && l[i]<lastLo && c[i]>lastLo;
+    const iSH = lastHi!=null && h[i]>lastHi && c[i]<lastHi;
+    if(lw > 2*body && iSL) rbL=true;
+    if(uw > 2*body && iSH) rbS=true;
+  }
+
+  let lvL=false, lvS=false;
+  for(let i=Math.max(2,N-15);i<N;i++){
+    const sU = c[i]>o[i] && (c[i]-o[i])>r;
+    const sU1= c[i-1]>o[i-1] && (c[i-1]-o[i-1])>r;
+    const sU2= c[i-2]>o[i-2] && (c[i-2]-o[i-2])>r;
+    if(sU && sU1 && sU2) lvL=true;
+    const sD = c[i]<o[i] && (o[i]-c[i])>r;
+    const sD1= c[i-1]<o[i-1] && (o[i-1]-c[i-1])>r;
+    const sD2= c[i-2]<o[i-2] && (o[i-2]-c[i-2])>r;
+    if(sD && sD1 && sD2) lvS=true;
+  }
+
+  const hh20 = Math.max(...h.slice(-20));
+  const ll20 = Math.min(...l.slice(-20));
+  const hh50 = Math.max(...h.slice(-70,-20));
+  const ll50 = Math.min(...l.slice(-70,-20));
+  const mbL = inBullOB && hh20 <= hh50;
+  const mbS = inBearOB && ll20 >= ll50;
+
+  const eqMid = (hh20+ll20)/2;
+  const inDisc = c[N-1] < eqMid;
+  const inPrem = c[N-1] > eqMid;
+  const rangePct = (hh20-ll20) > 0 ? (c[N-1]-ll20)/(hh20-ll20) : 0.5;
+  const extremePrem = rangePct > 0.79;
+  const extremeDisc = rangePct < 0.21;
+
+  let eqHi=0, eqLo=0;
+  for(let i=N-20;i<N-1;i++){
+    for(let j=i+1;j<N;j++){
+      if(Math.abs(h[i]-h[j])/h[j] < 0.0007) eqHi++;
+      if(Math.abs(l[i]-l[j])/l[j] < 0.0007) eqLo++;
+    }
+  }
+  const equalHighs = eqHi >= 2;
+  const equalLows  = eqLo >= 2;
+
+  let inOteL=false, inOteS=false;
+  if(lastHi!=null && lastLo!=null && lastHi > lastLo){
+    const swHi=lastHi, swLo=lastLo;
+    const fib62 = swHi - (swHi-swLo)*0.62;
+    const fib79 = swHi - (swHi-swLo)*0.79;
+    if(biasL && c[N-1] <= fib62 && c[N-1] >= fib79) inOteL=true;
+    const fib62S = swLo + (swHi-swLo)*0.62;
+    const fib79S = swLo + (swHi-swLo)*0.79;
+    if(biasS && c[N-1] >= fib62S && c[N-1] <= fib79S) inOteS=true;
+  }
+
+  const uniL = bbBull && inBullFvg;
+  const uniS = bbBear && inBearFvg;
+
+  const rs = rsi(c, 14);
+  const pv = pivots(exec, 3);
+  const priceHighIdx=[], priceLowIdx=[];
+  for(let i=0;i<N;i++){ if(pv.ph[i]!=null) priceHighIdx.push(i); if(pv.pl[i]!=null) priceLowIdx.push(i); }
+  let bearDiv=false, bullDiv=false;
+  if(priceHighIdx.length>=2){
+    const a=priceHighIdx[priceHighIdx.length-2], b=priceHighIdx[priceHighIdx.length-1];
+    if(h[b] > h[a] && rs[b]!=null && rs[a]!=null && rs[b] < rs[a]) bearDiv=true;
+  }
+  if(priceLowIdx.length>=2){
+    const a=priceLowIdx[priceLowIdx.length-2], b=priceLowIdx[priceLowIdx.length-1];
+    if(l[b] < l[a] && rs[b]!=null && rs[a]!=null && rs[b] > rs[a]) bullDiv=true;
+  }
+  const rsiOverbought = rs[N-1]!=null && rs[N-1] > 70;
+  const rsiOversold   = rs[N-1]!=null && rs[N-1] < 30;
+
+  let pdhSweep=false, pdlSweep=false;
+  if(dly && dly.length>=2){
+    const pdh = dly[dly.length-2].h, pdl = dly[dly.length-2].l;
+    for(let k=0;k<5 && N-1-k>=0;k++){
+      const i=N-1-k;
+      if(h[i] > pdh && c[i] < pdh) pdhSweep=true;
+      if(l[i] < pdl && c[i] > pdl) pdlSweep=true;
+    }
+  }
+
+  const turtleBuy  = sL && c[N-1] > o[N-1];
+  const turtleSell = sH && c[N-1] < o[N-1];
+
+  let ifvgBear=false, ifvgBull=false;
+  for(let i=Math.max(2,N-20);i<N;i++){
+    const bull = l[i] > h[i-2];
+    if(bull){
+      const gapT=l[i], gapB=h[i-2];
+      for(let j=i+1;j<N;j++){
+        if(c[j] < gapB){
+          for(let k=j+1;k<N;k++){ if(c[k] > gapT){ ifvgBull=true; break; } }
+          break;
+        }
+      }
+    }
+    const bear = h[i] < l[i-2];
+    if(bear){
+      const gapT=l[i-2], gapB=h[i];
+      for(let j=i+1;j<N;j++){
+        if(c[j] > gapT){
+          for(let k=j+1;k<N;k++){ if(c[k] < gapB){ ifvgBear=true; break; } }
+          break;
+        }
+      }
+    }
+  }
+
+  let exhaustLong=false, exhaustShort=false;
+  if(N>=4){
+    const big = (i,dir)=>{ const bo=Math.abs(c[i]-o[i]); return dir>0 ? (c[i]>o[i]&&bo>r*0.8) : (c[i]<o[i]&&bo>r*0.8); };
+    if(big(N-4,1)&&big(N-3,1)&&big(N-2,1)&&c[N-1]<=c[N-2]) exhaustLong=true;
+    if(big(N-4,-1)&&big(N-3,-1)&&big(N-2,-1)&&c[N-1]>=c[N-2]) exhaustShort=true;
+  }
+
+  // Fixed exit threshold in v4 (scalp/swing toggle removed) — median of scalp=3 and swing=4
+  const exitThreshold = 3;
+
+  const topScore = (bearDiv?2:0)+(rsiOverbought?1:0)+(extremePrem?1:0)
+                 +(pdhSweep?2:0)+(turtleSell?2:0)+(ifvgBear?1:0)+(exhaustLong?1:0);
+  const botScore = (bullDiv?2:0)+(rsiOversold?1:0)+(extremeDisc?1:0)
+                 +(pdlSweep?2:0)+(turtleBuy?2:0)+(ifvgBull?1:0)+(exhaustShort?1:0);
+
+  const volAvg = v.slice(-20).reduce((a,b)=>a+b,0)/20;
+  const volRatio = volAvg>0 ? v[N-1]/volAvg : 0;
+  const volBull = c[N-1] > o[N-1];
+
+  const scoreL = (inBullOB?1:0)+(inBullFvg?1:0)+(bbBull?1:0)+(mbL?1:0)+(rbL?1:0)
+               +(lvL?1:0)+(inDisc?1:0)+(sweepLo4?1:0)+(biasL?1:0)+(uniL?3:0);
+  const scoreS = (inBearOB?1:0)+(inBearFvg?1:0)+(bbBear?1:0)+(mbS?1:0)+(rbS?1:0)
+               +(lvS?1:0)+(inPrem?1:0)+(sweepHi4?1:0)+(biasS?1:0)+(uniS?3:0);
+
+  const nyNow = tzParts("America/New_York");
+  const inSilver = nyNow.hh === 10;
+
+  return {
+    price:c[N-1], rsi:rs[N-1], bias4hLong, bias4hShort, biasL, biasS,
+    volRatio, volBull, displUp, displDn,
+    equalHighs, equalLows, inOteL, inOteS, inSilver,
+    arrays:{
+      "Order Block":   [inBullOB, inBearOB],
+      "Fair Value Gap":[inBullFvg, inBearFvg],
+      "Breaker Block": [bbBull, bbBear],
+      "Mitigation":    [mbL, mbS],
+      "Rejection":     [rbL, rbS],
+      "Liquidity Void":[lvL, lvS],
+      "Discount/Prem": [inDisc, inPrem],
+      "Sweep (<4 bar)":[sweepLo4, sweepHi4],
+      "4H+1H bias":    [biasL, biasS],
+      "★ UNICORN":     [uniL, uniS],
+    },
+    exits:{
+      "RSI divergence":[bullDiv, bearDiv],
+      "RSI 70/30":     [rsiOversold, rsiOverbought],
+      "Extreme P/D":   [extremeDisc, extremePrem],
+      "PDH/PDL sweep": [pdlSweep, pdhSweep],
+      "Turtle soup":   [turtleBuy, turtleSell],
+      "Inverted FVG":  [ifvgBull, ifvgBear],
+      "Displ. exhaust":[exhaustShort, exhaustLong],
+    },
+    scoreL, scoreS, topScore, botScore, exitThreshold,
+    long_trigger:  scoreL >= 3 && biasL && inBullFvg,
+    short_trigger: scoreS >= 3 && biasS && inBearFvg,
+    long_exit:  topScore >= exitThreshold,
+    short_exit: botScore >= exitThreshold,
+  };
+}
+
+/* ---------- Fetch + resample seeding (binance.us only) ------------------- */
+async function seedHistory(sym, tf, limit){
+  const cfg = TF_MAP[tf] || {native:tf, mult:1};
+  const base = "https://api.binance.us";
+  const fetchLimit = Math.min(1000, limit * cfg.mult);
+  const r = await fetch(`${base}/api/v3/klines?symbol=${sym}&interval=${cfg.native}&limit=${fetchLimit}`);
+  const arr = await r.json();
+  const raw = arr.map(k=>({t:k[0], o:+k[1], h:+k[2], l:+k[3], c:+k[4], v:+k[5]}));
+  return resampleBars(raw, cfg.mult);
+}
+
+/* ---------- Open Interest top-5 panel (Binance Futures) ------------------ */
+const OI_CANDIDATES = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","AVAXUSDT","LINKUSDT","ADAUSDT","MATICUSDT"];
+async function fetchOIHist(sym){
+  // period=1h limit=73 covers current + -72h (73 hourly snapshots inclusive)
+  try{
+    const r = await fetch(`https://fapi.binance.com/futures/data/openInterestHist?symbol=${sym}&period=1h&limit=73`);
+    if(!r.ok) return null;
+    const arr = await r.json();
+    if(!Array.isArray(arr) || arr.length<25) return null;
+    return arr.map(x=>({t:+x.timestamp, oi:+x.sumOpenInterest, oiVal:+x.sumOpenInterestValue}));
+  }catch(e){ return null; }
+}
+async function refreshOiPanel(){
+  const body = document.getElementById("oiBody");
+  if(!body) return;
+  const series = await Promise.all(OI_CANDIDATES.map(fetchOIHist));
+  const rows = [];
+  for(let i=0;i<OI_CANDIDATES.length;i++){
+    const s = series[i];
+    if(!s || s.length<25) continue;
+    rows.push({sym: OI_CANDIDATES[i], series:s});
+  }
+  rows.sort((a,b)=> (b.series[b.series.length-1].oiVal||0) - (a.series[a.series.length-1].oiVal||0));
+  const top = rows.slice(0,5);
+  if(!top.length){ body.innerHTML = `<tr><td colspan="8" style="color:var(--muted);padding:10px">OI fetch failed — Binance Futures may be geo-blocked in your region.</td></tr>`; return; }
+  const pct = (a,b)=> b>0 ? (a-b)/b : 0;
+  const fmtPct = p => {
+    const s = (p*100).toFixed(2)+"%";
+    return p>0 ? `<span class="oi-pos">+${s}</span>` : p<0 ? `<span class="oi-neg">${s}</span>` : `<span style="color:var(--muted)">${s}</span>`;
+  };
+  body.innerHTML = top.map(({sym, series})=>{
+    const n = series.length;
+    const now  = series[n-1].oi;
+    const h1   = series[n-2] ? series[n-2].oi : now;
+    const h4   = series[n-5] ? series[n-5].oi : series[0].oi;
+    const h24  = series[n-25] ? series[n-25].oi : series[0].oi;
+    const h48  = series[n-49] ? series[n-49].oi : series[0].oi;
+    const h72  = series[0].oi; // requested limit=73 → index 0 is -72h
+    const d1   = pct(now, h1);
+    const d4   = pct(now, h4);
+    const d24  = pct(now, h24);
+    const d48  = pct(now, h48);
+    const d72  = pct(now, h72);
+    const snap = (oi, delta)=>{
+      const cls = delta>0 ? "oi-pos" : delta<0 ? "oi-neg" : "";
+      return `<span class="oi-hist">${fmtBig(oi)}</span> <span class="${cls}" style="font-size:10px">${(delta*100).toFixed(2)}%</span>`;
+    };
+    const read = (d1>0.01 && d24>0) ? "Build-up · trend"
+               : (d1<-0.01 && d24<0) ? "Unwind · capitulation"
+               : (d1>0.01 && d24<0) ? "Reversal fuel · squeeze risk"
+               : (d1<-0.01 && d24>0) ? "Profit-take / cooling"
+               : "Drifting";
+    return `<tr>
+      <td><b>${sym.replace("USDT","")}</b></td>
+      <td class="live">${fmtBig(now)}</td>
+      <td>${fmtPct(d1)}</td>
+      <td>${fmtPct(d4)}</td>
+      <td>${fmtPct(d24)}</td>
+      <td>${snap(h48, d48)}</td>
+      <td>${snap(h72, d72)}</td>
+      <td style="color:var(--muted);font-size:10px">${read}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ---------- USDT.D (CoinGecko) ------------------------------------------- */
+async function fetchUsdtD(){
+  try{
+    const r = await fetch("https://api.coingecko.com/api/v3/global");
+    const j = await r.json();
+    const pct = j?.data?.market_cap_percentage?.usdt;
+    if(typeof pct === "number"){
+      const prev = STATE.usdt.now;
+      STATE.usdt.now = pct;
+      if(prev!=null) STATE.usdt.delta = pct - prev;
+      renderUsdtD();
+    }
+  }catch(e){ /* ignore */ }
+}
+function renderUsdtD(){
+  const vEl = document.getElementById("usdtD_v");
+  const cEl = document.getElementById("usdtD_chg");
+  const tEl = document.getElementById("usdtD_tag");
+  if(STATE.usdt.now==null){ vEl.textContent="—"; return; }
+  vEl.textContent = STATE.usdt.now.toFixed(2)+"%";
+  if(STATE.usdt.delta!=null){
+    const d = STATE.usdt.delta;
+    cEl.textContent = `Δ${d>=0?"+":""}${d.toFixed(3)} pts (this session)`;
+    cEl.style.color = d>0 ? "var(--red)" : d<0 ? "var(--green)" : "var(--muted)";
+    tEl.className = "tag " + (d>0.02?"off" : d<-0.02?"on" : "flat");
+    tEl.textContent = d>0.02 ? "risk-off bias" : d<-0.02 ? "risk-on bias" : "neutral";
+  }
+}
+
+function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+/* ---------- Tickers ------------------------------------------------------ */
+function wireTicker(sym){
+  if(STATE.data[sym]) return;
+  STATE.data[sym] = { exec:[], h1:[], h4:[], d:[], price:null, ws:null, onchain:null, tfBias:{} };
+  renderCards();
+  (async()=>{
+    try{
+      STATE.data[sym].exec = await seedHistory(sym, STATE.tf, 250);
+      STATE.data[sym].h1   = await seedHistory(sym, "1h",   80);
+      STATE.data[sym].h4   = await seedHistory(sym, "4h",   100);
+      STATE.data[sym].d    = await seedHistory(sym, "1d",   30);
+      STATE.data[sym].price = STATE.data[sym].exec.at(-1).c;
+      // 5D fix: pre-seed __raw1d so the first WS kline_1d doesn't clobber the resampled exec array
+      if(TF_MAP[STATE.tf].mult > 1){
+        try{
+          const rawLimit = Math.min(1000, 250 * TF_MAP[STATE.tf].mult);
+          const rr = await fetch(`https://api.binance.us/api/v3/klines?symbol=${sym}&interval=1d&limit=${rawLimit}`);
+          const rawArr = await rr.json();
+          STATE.data[sym].__raw1d = rawArr.map(k=>({t:k[0], o:+k[1], h:+k[2], l:+k[3], c:+k[4], v:+k[5]}));
+          STATE.data[sym].exec = resampleBars(STATE.data[sym].__raw1d, TF_MAP[STATE.tf].mult);
+          STATE.data[sym].price = STATE.data[sym].exec.at(-1).c;
+        }catch(e){ log("warn", sym, `raw 1d seed failed: ${e.message}`); }
+      }
+      recompute(sym);
+      computeTfCluster(sym);
+    }catch(e){ log("warn", sym, `history failed: ${e.message}`); }
+
+    const lower = sym.toLowerCase();
+    const nativeExec = TF_MAP[STATE.tf].native;
+    const streams = Array.from(new Set([`${lower}@kline_${nativeExec}`,`${lower}@kline_1h`,`${lower}@kline_4h`,`${lower}@kline_1d`]));
+    const url = `${STATE.endpoint}/${streams.join("/")}`;
+    const ws = new WebSocket(url);
+    STATE.data[sym].ws = ws;
+    ws.onopen  = ()=>{ setConn(true); log("info", sym, `stream connected · ${STATE.tf}`); };
+    ws.onclose = ()=>{ setConn(false); log("warn", sym, "stream closed, retry in 3s"); setTimeout(()=>{ delete STATE.data[sym]; wireTicker(sym); }, 3000); };
+    ws.onerror = ()=>log("warn", sym, "ws error");
+    ws.onmessage = ev=>{
+      const m = JSON.parse(ev.data);
+      const k = m.k; if(!k) return;
+      const interval = k.i;
+      const cand = {t:k.t, o:+k.o, h:+k.h, l:+k.l, c:+k.c, v:+k.v};
+      const isExecNative = interval===nativeExec;
+      if(isExecNative){
+        // For resampled TFs, need to rebuild the current 5d bar by resampling recent 1d data
+        if(TF_MAP[STATE.tf].mult > 1){
+          // Append/update raw 1d buffer -> store raw separately
+          STATE.data[sym].__raw1d = STATE.data[sym].__raw1d || [];
+          const raw = STATE.data[sym].__raw1d;
+          if(raw.length && raw[raw.length-1].t === cand.t) raw[raw.length-1] = cand;
+          else if(k.x || !raw.length || cand.t > raw[raw.length-1].t) raw.push(cand);
+          if(raw.length>500) raw.shift();
+          STATE.data[sym].exec = resampleBars(raw, TF_MAP[STATE.tf].mult);
+        } else {
+          const arr = STATE.data[sym].exec;
+          const last = arr[arr.length-1];
+          if(last && cand.t === last.t) arr[arr.length-1] = cand;
+          else if(k.x || cand.t > (last?last.t:0)){ arr.push(cand); if(arr.length>300) arr.shift(); }
+        }
+        STATE.data[sym].price = cand.c;
+      } else {
+        const arr = interval==="1h" ? STATE.data[sym].h1
+                 : interval==="4h" ? STATE.data[sym].h4
+                 : interval==="1d" ? STATE.data[sym].d : null;
+        if(!arr) return;
+        const last = arr[arr.length-1];
+        if(last && cand.t === last.t) arr[arr.length-1] = cand;
+        else if(k.x || cand.t > (last?last.t:0)){ arr.push(cand); if(arr.length>300) arr.shift(); }
+      }
+      recompute(sym);
+      computeTfCluster(sym);
+    };
+  })();
+}
+
+function removeTicker(sym){
+  const d = STATE.data[sym];
+  if(d && d.ws) try{ d.ws.close(); }catch(_){}
+  delete STATE.data[sym];
+  STATE.tickers = STATE.tickers.filter(t=>t!==sym);
+  localStorage.setItem("ict_tickers", JSON.stringify(STATE.tickers));
+  renderCards(); renderConfluence();
+}
+function rewireAll(){
+  // endpoint is hardcoded to binance.us in V6 — just tear down and re-wire every ticker
+  for(const s of Object.keys(STATE.data)){ try{ STATE.data[s].ws.close(); }catch(_){} delete STATE.data[s]; }
+  STATE.tickers.forEach(wireTicker);
+}
+function addTicker(){
+  const v = document.getElementById("newSym").value.trim().toUpperCase();
+  if(!v) return;
+  if(STATE.tickers.includes(v)){ log("warn", v, "already added"); return; }
+  STATE.tickers.push(v);
+  localStorage.setItem("ict_tickers", JSON.stringify(STATE.tickers));
+  wireTicker(v);
+  document.getElementById("newSym").value = "";
+}
+
+/* ---------- Controls ----------------------------------------------------- */
+document.getElementById("tfgroup").addEventListener("click", e=>{
+  if(e.target.tagName!=="BUTTON") return;
+  document.querySelectorAll("#tfgroup button").forEach(b=>b.classList.remove("on"));
+  e.target.classList.add("on");
+  STATE.tf = e.target.dataset.tf;
+  localStorage.setItem("ict_tf", STATE.tf);
+  log("info","·",`Execution TF → ${STATE.tf}`);
+  rewireAll();
+});
+document.getElementById("sidegroup").addEventListener("click", e=>{
+  if(e.target.tagName!=="BUTTON") return;
+  document.querySelectorAll("#sidegroup button").forEach(b=>{b.classList.remove("on-L","on-B","on-S")});
+  const s = e.target.dataset.side;
+  STATE.side = s;
+  localStorage.setItem("ict_side", s);
+  e.target.classList.add(s==="long"?"on-L":s==="short"?"on-S":"on-B");
+  log("info","·",`Side filter → ${s.toUpperCase()}`);
+});
+function initControlsUi(){
+  document.querySelectorAll("#tfgroup button").forEach(b=>{ b.classList.toggle("on", b.dataset.tf===STATE.tf); });
+  document.querySelectorAll("#sidegroup button").forEach(b=>{
+    b.classList.remove("on-L","on-B","on-S");
+    if(b.dataset.side===STATE.side) b.classList.add(STATE.side==="long"?"on-L":STATE.side==="short"?"on-S":"on-B");
+  });
+}
+initControlsUi();
+
+/* ---------- Clocks (clickable to switch tz) ------------------------------ */
+document.querySelectorAll(".clk").forEach(el=>{
+  el.addEventListener("click", ()=>{
+    STATE.clockTz = el.dataset.tz;
+    localStorage.setItem("ict_clockTz", STATE.clockTz);
+    document.querySelectorAll(".clk").forEach(x=>x.classList.remove("selected"));
+    el.classList.add("selected");
+    renderSessionStrip();
+    log("info","·",`Session timezone → ${STATE.clockTz}`);
+  });
+});
+function markSelectedClock(){
+  document.querySelectorAll(".clk").forEach(x=>x.classList.toggle("selected", x.dataset.tz===STATE.clockTz));
+}
+markSelectedClock();
+
+/* ---------- TF cluster (MTF bias badges) --------------------------------- */
+function computeTfCluster(sym){
+  // Compute long/short bias on h1, h4, d arrays (already cached)
+  const d = STATE.data[sym]; if(!d) return;
+  const cluster = {};
+  const mk = (arr, key)=>{
+    if(!arr || arr.length<55) return;
+    const pd = computeArrays(arr, d.h1, d.h4, d.d);
+    if(!pd) return;
+    cluster[key] = pd.biasL ? "bull" : pd.biasS ? "bear" : pd.long_trigger ? "bull" : pd.short_trigger ? "bear" : null;
+  };
+  // For MTF badges we want the directional signal per TF
+  mk(d.h1, "1h");
+  mk(d.h4, "4h");
+  mk(d.d,  "1d");
+  d.tfCluster = cluster;
+}
+
+/* ---------- Panel toggle ------------------------------------------------- */
+function togglePanel(key){
+  const el = document.querySelector(`.panel[data-key="${key}"]`);
+  if(!el) return;
+  el.classList.toggle("hidden");
+  STATE.panels[key] = el.classList.contains("hidden");
+  localStorage.setItem("ict_panels", JSON.stringify(STATE.panels));
+}
+function restorePanels(){
+  for(const [k,v] of Object.entries(STATE.panels||{})){
+    if(v){ const el = document.querySelector(`.panel[data-key="${k}"]`); if(el) el.classList.add("hidden"); }
+  }
+}
+restorePanels();
+
+/* ---------- recompute + alert emit --------------------------------------- */
+function recompute(sym){
+  const d = STATE.data[sym]; if(!d) return;
+  const pd = computeArrays(d.exec, d.h1, d.h4, d.d);
+  d.pd = pd;
+  renderCard(sym);
+  renderConfluence();
+  if(!pd) return;
+
+  d.lastSig = d.lastSig || {};
+  const sideAllows = (isLong)=>{
+    if(STATE.side === "long"  && !isLong) return false;
+    if(STATE.side === "short" &&  isLong) return false;
+    return true;
+  };
+  const emit = (key, cls, msg, isLong)=>{
+    if(!sideAllows(isLong)){ d.lastSig[key]=false; return; }
+    if(!d.lastSig[key]){
+      log(cls, sym, msg);
+      notifySafe(`${sym}:${key}`, `${sym} · ${msg}`);
+      d.lastSig[key]=true;
+    }
+  };
+  const clear = (key)=>{ d.lastSig[key]=false; };
+
+  if(pd.arrays["★ UNICORN"][0]) emit("uniL","unicorn","★ Bullish UNICORN (BB+FVG)", true); else clear("uniL");
+  if(pd.arrays["★ UNICORN"][1]) emit("uniS","unicorn","★ Bearish UNICORN (BB+FVG)", false); else clear("uniS");
+  if(pd.long_trigger)  emit(`L${pd.scoreL}`, "long",  `LONG entry · score ${pd.scoreL}`, true); else clear(`L${pd.scoreL}`);
+  if(pd.short_trigger) emit(`S${pd.scoreS}`, "short", `SHORT entry · score ${pd.scoreS}`, false); else clear(`S${pd.scoreS}`);
+  if(pd.long_exit)  emit(`LX${pd.topScore}`, "exit", `⚠ TOP signal · exit longs · score ${pd.topScore}`, false); else clear(`LX${pd.topScore}`);
+  if(pd.short_exit) emit(`SX${pd.botScore}`, "exit", `⚠ BOTTOM signal · exit shorts · score ${pd.botScore}`, true); else clear(`SX${pd.botScore}`);
+
+  /* Confluence alerts — gated by HTF bias alignment (fixes contradiction noise) */
+  const dow = new Date().toLocaleDateString("en-US",{weekday:"short"});
+  for(const s of SITUATIONS){
+    const chk = s.check(pd);
+    let fireL = chk[0], fireS = chk[1];
+    const tfOk = s.tfs.includes(STATE.tf);
+    const dayOk = (s.dayScore[dow]||0) >= 2;
+    // HTF-bias gate: if HTF is bullish, suppress short situations; if bearish, suppress long
+    if(pd.biasL) fireS = false;
+    if(pd.biasS) fireL = false;
+    if(tfOk && dayOk && (fireL || fireS)){
+      const dir = fireL ? "LONG" : "SHORT";
+      const isLong = fireL;
+      if(sideAllows(isLong)){
+        const key = `CONF_${s.id}_${dir}`;
+        emit(key, "confl",
+          `⚡ CONFLUENCE · ${s.name} · ${STATE.tf} · ${dow} · tier ${s.tier} · ${dir}`, isLong);
+        // push into cluster buffer
+        const bufKey = `${sym}:${dir}`;
+        STATE.confBuffer[bufKey] = STATE.confBuffer[bufKey] || [];
+        const now = Date.now();
+        STATE.confBuffer[bufKey] = STATE.confBuffer[bufKey].filter(x=>now-x.ts < CLUSTER_WINDOW_MS);
+        if(!STATE.confBuffer[bufKey].some(x=>x.sitId===s.id)){
+          STATE.confBuffer[bufKey].push({sitId:s.id, ts:now});
+        }
+      }
+    } else {
+      clear(`CONF_${s.id}_LONG`);
+      clear(`CONF_${s.id}_SHORT`);
+    }
+  }
+
+  /* 🦖 mega-cluster: ≥3 distinct situations fired inside window.
+     cluster-l = cyan long · cluster-s = red short · cluster-b = fuchsia both sides firing */
+  const clusterSides = {LONG:false, SHORT:false};
+  for(const dir of ["LONG","SHORT"]){
+    const bufKey = `${sym}:${dir}`;
+    const buf = STATE.confBuffer[bufKey];
+    if(!buf) continue;
+    const now = Date.now();
+    const recent = buf.filter(x=>now-x.ts < CLUSTER_WINDOW_MS);
+    STATE.confBuffer[bufKey] = recent;
+    if(recent.length >= CLUSTER_THRESHOLD){
+      clusterSides[dir] = true;
+      const isLong = dir==="LONG";
+      if(sideAllows(isLong)){
+        const key = `DINO_${dir}_${new Date(Math.floor(now/CLUSTER_WINDOW_MS)*CLUSTER_WINDOW_MS).toISOString()}`;
+        if(!d.lastSig[key]){
+          const names = recent.map(x=>SITUATIONS.find(S=>S.id===x.sitId)?.name||x.sitId).join(" + ");
+          const emoji = isLong ? "🦖" : "🦖🔻";
+          const cls = isLong ? "dino" : "dino-s";
+          log(cls, sym, `${emoji} MEGA-CLUSTER · ${recent.length}× ${dir} confluences (${names})`);
+          notifySafe(`dino:${sym}:${dir}`, `${emoji} ${sym} · ${recent.length}× ${dir} confluence cluster`);
+          d.lastSig[key]=true;
+        }
+      }
+    }
+  }
+  const card = document.getElementById(`card_${sym}`);
+  if(card){
+    card.classList.remove("cluster-l","cluster-s","cluster-b");
+    if(clusterSides.LONG && clusterSides.SHORT) card.classList.add("cluster-b");
+    else if(clusterSides.LONG) card.classList.add("cluster-l");
+    else if(clusterSides.SHORT) card.classList.add("cluster-s");
+    if(clusterSides.LONG || clusterSides.SHORT){
+      d.clusterClearTO && clearTimeout(d.clusterClearTO);
+      d.clusterClearTO = setTimeout(()=>{
+        const c = document.getElementById(`card_${sym}`);
+        if(c) c.classList.remove("cluster-l","cluster-s","cluster-b");
+      }, 90_000);
+    }
+  }
+}
+
+/* ---------- Session clock + killzones ------------------------------------ */
+const KZONES = [
+  {name:"ASIA KZ",      hmET:[20*60, 23*60]},
+  {name:"LONDON KZ",    hmET:[2*60,   5*60]},
+  {name:"NY AM KZ",     hmET:[7*60,  10*60]},
+  {name:"SILVER BULLET",hmET:[10*60, 11*60]},
+  {name:"NY PM KZ",     hmET:[13*60+30, 16*60]},
+  {name:"PULSE xx:00-30", pulse:true},
+];
+function tzParts(tz){
+  const d = new Date();
+  const s = d.toLocaleString("en-US",{timeZone:tz,hour12:false,hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  let [hh,mm,ss] = s.split(":").map(Number);
+  if(hh===24) hh=0;
+  return {hh,mm,ss};
+}
+function etMinToTz(etMin, tz){
+  // Take "today" 00:00 ET then add etMin, then format in tz
+  const now = new Date();
+  // Build a date string "YYYY-MM-DD 00:00" in ET by formatting
+  const et = now.toLocaleString("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
+  const [mm,dd,yy] = et.split(/[\/,\s]+/).filter(Boolean);
+  const baseUtc = new Date(`${yy}-${mm}-${dd}T00:00:00-05:00`); // approximate ET offset
+  // Simpler: use current date and offset via Intl for display
+  const target = new Date(baseUtc.getTime() + etMin*60_000);
+  const tzStr = target.toLocaleString("en-US",{timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false});
+  return tzStr;
+}
+function renderClocks(){
+  const zones = [
+    {id:"clk-ny",  tz:"America/New_York"},
+    {id:"clk-ldn", tz:"Europe/London"},
+    {id:"clk-tky", tz:"Asia/Tokyo"},
+  ];
+  for(const z of zones){
+    const {hh,mm,ss} = tzParts(z.tz);
+    const el = document.getElementById(z.id);
+    const mh = el.querySelector(".mh"), mmL = el.querySelector(".mm"), ms = el.querySelector(".ms");
+    const digitsEl = el.querySelector(".digital");
+    const hDeg = ((hh%12) + mm/60) * 30;
+    const mDeg = (mm + ss/60) * 6;
+    const sDeg = ss * 6;
+    mh.setAttribute("transform",`rotate(${hDeg})`);
+    mmL.setAttribute("transform",`rotate(${mDeg})`);
+    ms.setAttribute("transform",`rotate(${sDeg})`);
+    digitsEl.textContent = `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
+    const active = hh>=8 && hh<17;
+    el.classList.toggle("live", active);
+  }
+}
+function renderSessionStrip(){
+  document.getElementById("sclock_tz").textContent = STATE.clockTz;
+  const {hh,mm} = tzParts("America/New_York");
+  const tminET = hh*60 + mm;
+  const cnt  = document.getElementById("sclock_grid");
+  cnt.innerHTML = "";
+  for(const k of KZONES){
+    const isPulse = !!k.pulse;
+    const active = isPulse ? (tzParts(STATE.clockTz).mm < 30) : (tminET >= k.hmET[0] && tminET < k.hmET[1]);
+    const div = document.createElement("div");
+    div.className = "kz " + (isPulse?"pulse ":"") + (active?"active":"");
+    let timeStr;
+    if(isPulse) timeStr = "every hour";
+    else{
+      timeStr = `${etMinToTz(k.hmET[0], STATE.clockTz)}-${etMinToTz(k.hmET[1], STATE.clockTz)}`;
+    }
+    div.innerHTML = `<div class="name">${k.name}</div><div class="time">${timeStr}</div>`;
+    cnt.appendChild(div);
+    if(isPulse && active){
+      const key = "__pulseMin";
+      if(STATE.lastPulseState[key] !== Math.floor(hh))
+        { STATE.lastPulseState[key] = Math.floor(hh); log("info","·", "Round-Hour Pulse window opened"); }
+    }
+  }
+}
+setInterval(()=>{ renderClocks(); renderSessionStrip(); }, 1000);
+renderClocks(); renderSessionStrip();
+
+setInterval(fetchUsdtD, 5*60*1000);
+setInterval(refreshOiPanel, 60_000);
+fetchUsdtD();
+refreshOiPanel();
+
+/* ---------- Render cards ------------------------------------------------- */
+function renderCards(){
+  const g = document.getElementById("grid");
+  g.innerHTML = "";
+  for(const sym of STATE.tickers){
+    const card = document.createElement("div");
+    card.className = "ticker-card";
+    card.id = `card_${sym}`;
+    card.innerHTML = cardHtml(sym);
+    g.appendChild(card);
+  }
+}
+function volBarHtml(pd){
+  if(!pd) return `<div class="volbar"></div><div class="vollabel">—</div>`;
+  const h = Math.max(4, Math.min(100, pd.volRatio*50));
+  const hueBase = pd.volRatio < 0.5 ? 0 : pd.volRatio < 1 ? 25 : pd.volRatio < 1.5 ? 90 : 140;
+  const col = pd.volBull ? `hsl(${hueBase} 70% 55%)` : `hsl(${hueBase} 70% 45%)`;
+  return `<div class="volbar" title="vol ratio ${pd.volRatio.toFixed(2)}× · red=low liq, green=max liq">
+      <div class="mark" style="bottom:50%"></div>
+      <div class="fill" style="height:${h}%;background:${col}"></div>
+    </div>
+    <div class="vollabel">${pd.volRatio.toFixed(1)}×</div>`;
+}
+
+function fmtBig(n){
+  if(n>=1e9) return (n/1e9).toFixed(2)+"B";
+  if(n>=1e6) return (n/1e6).toFixed(2)+"M";
+  if(n>=1e3) return (n/1e3).toFixed(2)+"K";
+  return n.toFixed(0);
+}
+function fmtMin(epochMs){
+  const d = Math.max(0, epochMs - Date.now());
+  const m = Math.floor(d/60000), s = Math.floor((d%60000)/1000);
+  return `${m}m${String(s).padStart(2,"0")}s`;
+}
+
+function tfClusterHtml(sym){
+  const d = STATE.data[sym];
+  const cluster = (d && d.tfCluster) || {};
+  const tfs = ["1h","4h","1d"];
+  return `<div class="tfcluster">${tfs.map(t=>{
+    const b = cluster[t];
+    const cls = b==="bull" ? "bull" : b==="bear" ? "bear" : "off";
+    const arr = b==="bull" ? "▲" : b==="bear" ? "▼" : "·";
+    return `<span class="tb ${cls}" title="${t} bias">${t} ${arr}</span>`;
+  }).join("")}</div>`;
+}
+
+function cardHtml(sym){
+  const d = STATE.data[sym];
+  const pd = d && d.pd;
+  const price = d ? (d.price||"—") : "—";
+  if(!pd){
+    return `<div class="ticker-head">
+      <span class="sym">${sym}</span><span class="price">${fmtPrice(price)}</span>
+      <button class="rm" onclick="removeTicker('${sym}')">×</button>
+    </div>
+    ${tfClusterHtml(sym)}
+    <div class="card-body"><table class="pd"><tr><td style="padding:10px;color:var(--muted)">loading…</td></tr></table><div><div class="volbar"></div><div class="vollabel">—</div></div></div>`;
+  }
+  const rows = Object.entries(pd.arrays).map(([k,[L,S]])=>{
+    const rowCls = k==="★ UNICORN" ? "unicorn-row" : "";
+    return `<tr class="${rowCls}"><td>${k}</td>
+      <td class="dot ${L?"on-L":"off"}">${L?"●":"·"}</td>
+      <td class="dot ${S?"on-S":"off"}">${S?"●":"·"}</td></tr>`;
+  }).join("");
+  const exitRows = Object.entries(pd.exits).map(([k,[L,S]])=>{
+    return `<tr class="exit-row"><td>${k}</td>
+      <td class="dot ${L?"fire":""}">${L?"▲":"·"}</td>
+      <td class="dot ${S?"fire":""}">${S?"▼":"·"}</td></tr>`;
+  }).join("");
+  const hit = 3;
+  const sL = `<span class="sL ${pd.scoreL>=hit?"hit":""}">${pd.scoreL}</span>`;
+  const sS = `<span class="sS ${pd.scoreS>=hit?"hit":""}">${pd.scoreS}</span>`;
+  const exitHit = pd.exitThreshold;
+  const tsc = `<span class="${pd.topScore>=exitHit?'sS hit':''}">${pd.topScore}</span>`;
+  const bsc = `<span class="${pd.botScore>=exitHit?'sL hit':''}">${pd.botScore}</span>`;
+  const rsiTxt = pd.rsi!=null ? pd.rsi.toFixed(0) : "—";
+
+  return `<div class="ticker-head">
+    <span class="sym">${sym}</span>
+    <span class="badge" style="font-size:9px">RSI ${rsiTxt}</span>
+    <span class="price">${fmtPrice(price)}</span>
+    <button class="rm" onclick="removeTicker('${sym}')">×</button>
+  </div>
+  ${tfClusterHtml(sym)}
+  <div class="card-body">
+    <table class="pd">
+      <tr><th>PD Array · ${STATE.tf}</th><th style="text-align:center">L</th><th style="text-align:center">S</th></tr>
+      ${rows}
+      <tr class="score-row"><td>SCORE ≥ ${hit}</td><td class="dot">${sL}</td><td class="dot">${sS}</td></tr>
+      <tr class="sectionbreak"><td colspan="3">Exit / Reversal</td></tr>
+      ${exitRows}
+      <tr class="score-row"><td>EXIT ≥ ${exitHit} (bot · top)</td><td class="dot">${bsc}</td><td class="dot">${tsc}</td></tr>
+    </table>
+    <div style="display:flex;flex-direction:column">
+      ${volBarHtml(pd)}
+    </div>
+  </div>`;
+}
+function renderCard(sym){
+  const el = document.getElementById(`card_${sym}`);
+  if(!el) return renderCards();
+  el.innerHTML = cardHtml(sym);
+}
+function fmtPrice(p){
+  if(p==="—"||p==null) return "—";
+  const n = +p;
+  return n>=100 ? n.toFixed(2) : n>=1 ? n.toFixed(4) : n.toFixed(6);
+}
+
+/* ---------- Confluence panel --------------------------------------------- */
+function dayCellHtml(s){
+  const dow = new Date().toLocaleDateString("en-US",{weekday:"short"});
+  const sc = s.dayScore[dow] || 0;
+  const cls = sc>=3 ? "day-hi" : sc===2 ? "day-md" : "day-lo";
+  const mark = sc>=3 ? "★" : "·";
+  return `<span class="${cls}">${s.days.join(", ")} ${mark}</span>`;
+}
+function renderConfluence(){
+  const tbody = document.getElementById("confBody");
+  if(!tbody) return;
+  const dow = new Date().toLocaleDateString("en-US",{weekday:"short"});
+  const rows = [];
+  for(const s of SITUATIONS){
+    const matches = [];
+    for(const sym of STATE.tickers){
+      const pd = STATE.data[sym] && STATE.data[sym].pd;
+      if(!pd) continue;
+      let [bull, bear] = s.check(pd);
+      // HTF bias gate (matches emit logic)
+      if(pd.biasL) bear = false;
+      if(pd.biasS) bull = false;
+      if(bull || bear) matches.push({sym, side: bull? "L" : "S"});
+    }
+    const tfOk = s.tfs.includes(STATE.tf);
+    const dayOk = (s.dayScore[dow]||0) >= 2;
+    const isActive = matches.length>0 && tfOk && dayOk;
+    const matchHtml = matches.length===0
+      ? `<span style="color:var(--muted)">—</span>`
+      : matches.map(m=>`<span style="color:${m.side==='L'?'var(--green)':'var(--red)'};margin-right:8px">${m.sym} ${m.side==='L'?'▲':'▼'}</span>`).join("");
+    rows.push(`<tr class="${isActive?'match':''}">
+      <td>${s.name}</td>
+      <td>${s.tfs.join(" · ")}${tfOk?' <span style="color:var(--gold)">◆</span>':''}</td>
+      <td>${dayCellHtml(s)}</td>
+      <td style="color:var(--muted)">${s.hold}</td>
+      <td style="color:var(--muted);font-size:10px">${s.why}</td>
+      <td class="tier-${s.tier}">${s.tier}</td>
+      <td class="live">${matchHtml}</td>
+    </tr>`);
+  }
+  tbody.innerHTML = rows.join("");
+}
+
+/* ---------- Feed + notifications ----------------------------------------- */
+function log(cls, sym, msg){
+  const ul = document.getElementById("feed");
+  const li = document.createElement("li");
+  li.className = cls;
+  const t = new Date().toLocaleTimeString([], {hour12:false});
+  li.innerHTML = `<span class="t">${t}</span><span class="sym">${sym}</span><span class="msg">${msg}</span>`;
+  ul.prepend(li);
+  while(ul.children.length > 300) ul.lastChild.remove();
+}
+function clearFeed(){ document.getElementById("feed").innerHTML=""; }
+function notifySafe(key, msg){
+  if(!STATE.notifOn) return;
+  const now = Date.now();
+  const last = STATE.lastNotif[key] || 0;
+  if(now - last < NOTIF_THROTTLE_MS) return;
+  STATE.lastNotif[key] = now;
+  try{ new Notification("ICT Signal", {body:msg, silent:false}); }catch(_){}
+}
+function setConn(ok){
+  const dot = document.getElementById("connDot"); const txt = document.getElementById("connTxt");
+  if(ok){ dot.classList.add("ok"); txt.textContent="live"; }
+  else { dot.classList.remove("ok"); txt.textContent="disconnected"; }
+}
+
+/* ---------- Init --------------------------------------------------------- */
+renderCards();
+renderConfluence();
+STATE.tickers.forEach(wireTicker);
+</script>
+</body>
+</html>
